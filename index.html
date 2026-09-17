@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Join Build Strong Academy and OSY student reports into the master CSV format.">
+  <title>Student Report Joiner</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js?v=2" defer></script>
+</head>
+<body>
+  <main class="app-shell">
+    <header class="masthead">
+      <div class="brand-mark" aria-hidden="true">BSA<span>/</span>OSY</div>
+      <div>
+        <p class="eyebrow">Operations utility · local-first</p>
+        <h1>Student report joiner</h1>
+        <p class="lede">Turn three working reports into one master-ready CSV without uploading student data anywhere.</p>
+      </div>
+    </header>
+
+    <section class="workflow" aria-labelledby="input-heading">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">01 / Inputs</p>
+          <h2 id="input-heading">Load the three source reports</h2>
+        </div>
+        <span class="privacy-note">Runs in your browser</span>
+      </div>
+
+      <div class="upload-grid">
+        <label class="upload-card required" for="bsaContact">
+          <span class="step">A</span>
+          <span class="upload-title">BSA contact report</span>
+          <span class="upload-copy">Student Info · contact, demographics, program history</span>
+          <span class="file-name" id="bsaContactName">Choose CSV</span>
+          <input id="bsaContact" type="file" accept=".csv,text/csv">
+        </label>
+        <label class="upload-card required" for="bsaGraduate">
+          <span class="step">B</span>
+          <span class="upload-title">BSA graduate report</span>
+          <span class="upload-copy">All Graduates · employer and placement details</span>
+          <span class="file-name" id="bsaGraduateName">Choose CSV</span>
+          <input id="bsaGraduate" type="file" accept=".csv,text/csv">
+        </label>
+        <label class="upload-card required" for="osyReport">
+          <span class="step">C</span>
+          <span class="upload-title">OSY report</span>
+          <span class="upload-copy">OSY · intake, status, scores, and referral data</span>
+          <span class="file-name" id="osyReportName">Choose CSV</span>
+          <input id="osyReport" type="file" accept=".csv,text/csv">
+        </label>
+      </div>
+
+      <div class="controls">
+        <button class="button primary" id="generateButton" type="button" disabled>Generate master CSV <span aria-hidden="true">↗</span></button>
+        <button class="button secondary" id="resetButton" type="button">Reset</button>
+      </div>
+      <p class="status" id="status" role="status">Add all three reports to begin.</p>
+    </section>
+
+    <section class="results" aria-labelledby="results-heading">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">02 / Review</p>
+          <h2 id="results-heading">Join summary</h2>
+        </div>
+        <button class="button download" id="downloadButton" type="button" disabled>Download CSV <span aria-hidden="true">↓</span></button>
+      </div>
+      <div class="metrics" id="metrics" aria-live="polite">
+        <div class="metric"><strong>—</strong><span>Output rows</span></div>
+        <div class="metric"><strong>—</strong><span>BSA records</span></div>
+        <div class="metric"><strong>—</strong><span>OSY records</span></div>
+        <div class="metric"><strong>—</strong><span>Co-enrolled</span></div>
+      </div>
+      <div class="review-panel" id="reviewPanel">
+        <p class="empty-state">Your join summary will appear here after generation.</p>
+      </div>
+    </section>
+
+    <footer>
+      <span>Output schema: <strong>master (1).csv</strong></span>
+      <span>Matching: email first, then normalized name</span>
+    </footer>
+  </main>
+</body>
+</html>
