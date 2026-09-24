@@ -42,13 +42,13 @@ h1 { max-width: 760px; margin-bottom: 18px; font-size: clamp(2.8rem, 7vw, 6.5rem
 .section-heading { display: flex; justify-content: space-between; gap: 20px; align-items: start; margin-bottom: 24px; }
 h2 { margin-bottom: 0; font-size: 1.4rem; letter-spacing: -.035em; }
 .privacy-note { padding: 8px 10px; background: var(--lime); font: 500 11px "DM Mono", monospace; text-transform: uppercase; }
-.upload-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-.upload-card { min-height: 205px; display: flex; flex-direction: column; padding: 18px; border: 1px dashed #aebbb2; background: var(--paper); cursor: pointer; transition: border-color .2s, transform .2s, background .2s; }
+.upload-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.upload-card { min-width: 0; min-height: 205px; display: flex; flex-direction: column; padding: 18px; border: 1px dashed #aebbb2; background: var(--paper); cursor: pointer; transition: border-color .2s, transform .2s, background .2s; }
 .upload-card:hover, .upload-card:focus-within { border-color: var(--teal); background: #f0f5ec; transform: translateY(-2px); }
 .step { width: 28px; height: 28px; display: grid; place-items: center; margin-bottom: 34px; background: var(--ink); color: var(--lime); font: 500 12px "DM Mono", monospace; }
 .upload-title { font-weight: 600; }
 .upload-copy { min-height: 45px; margin-top: 7px; color: var(--muted); font-size: .86rem; line-height: 1.45; }
-.file-name { overflow: hidden; margin-top: auto; padding-top: 15px; color: var(--teal); font: 500 11px "DM Mono", monospace; text-overflow: ellipsis; white-space: nowrap; }
+.file-name { min-width: 0; overflow: hidden; margin-top: auto; padding-top: 15px; color: var(--teal); font: 500 11px "DM Mono", monospace; text-overflow: ellipsis; white-space: nowrap; }
 input[type="file"] { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .controls { display: flex; gap: 10px; align-items: center; margin-top: 22px; }
 .button { border: 0; padding: 13px 16px; font: 600 12px "DM Mono", monospace; cursor: pointer; transition: transform .18s, opacity .18s; }
@@ -68,6 +68,11 @@ input[type="file"] { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .review-list { display: flex; flex-wrap: wrap; gap: 7px; padding: 0; margin: 0; list-style: none; }
 .review-list li { padding: 7px 9px; background: #eef3e9; font: 11px "DM Mono", monospace; }
 .review-label { margin: 0 0 10px; font: 500 11px "DM Mono", monospace; text-transform: uppercase; color: var(--teal); }
+.review-label.error { color: #a9432f; }
+.error-list li { background: #f9e9e5; color: #7d3024; }
+.review-details { margin-bottom: 12px; border-top: 1px solid var(--line); }
+.review-details summary { padding: 13px 0; color: var(--teal); cursor: pointer; font: 500 11px "DM Mono", monospace; text-transform: uppercase; }
+.review-details[open] summary { margin-bottom: 3px; }
 footer { display: flex; justify-content: space-between; gap: 20px; padding: 23px 2px 0; color: var(--muted); font: 11px "DM Mono", monospace; }
 footer strong { color: var(--ink); font-weight: 500; }
 
