@@ -4,21 +4,21 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Join Build Strong Academy and OSY student reports into the master CSV format.">
-  <title>Student Report Joiner</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
-  <script src="app.js?v=2" defer></script>
+  <title>Master Report Generator</title>
+  <!-- Only files from this folder may load; no inline scripts, no outside connections. `file:` lets it work when opened directly from disk. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' file:; style-src 'self' file:; font-src 'self' file:; img-src 'self' file:; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <link rel="stylesheet" href="fonts.css">
+  <link rel="stylesheet" href="styles.css?v=16">
+  <script src="app.js?v=18" defer></script>
 </head>
 <body>
   <main class="app-shell">
     <header class="masthead">
       <div class="brand-mark" aria-hidden="true">BSA<span>/</span>OSY</div>
       <div>
-        <p class="eyebrow">Operations utility · local-first</p>
-        <h1>Student report joiner</h1>
-        <p class="lede">Turn four working reports into one master-ready CSV without uploading student data anywhere.</p>
+        <h1>Master Report Generator</h1>
+        <p class="lede">Join any number of BSA and OSY reports into one master-ready CSV without uploading student data anywhere.</p>
       </div>
     </header>
 
@@ -26,71 +26,87 @@
       <div class="section-heading">
         <div>
           <p class="eyebrow">01 / Inputs</p>
-          <h2 id="input-heading">Load the four source reports</h2>
+          <h2 id="input-heading">Load any number of reports</h2>
         </div>
-        <span class="privacy-note">Runs in your browser</span>
       </div>
 
-      <div class="upload-grid">
-        <label class="upload-card required" for="bsaContact">
-          <span class="step">A</span>
-          <span class="upload-title">BSA contact report</span>
-          <span class="upload-copy">Student Info · contact, demographics, program history</span>
-          <span class="file-name" id="bsaContactName">Choose CSV</span>
-          <input id="bsaContact" type="file" accept=".csv,text/csv">
-        </label>
-        <label class="upload-card required" for="bsaGraduate">
-          <span class="step">B</span>
-          <span class="upload-title">BSA graduate report</span>
-          <span class="upload-copy">All Graduates · employer and placement details</span>
-          <span class="file-name" id="bsaGraduateName">Choose CSV</span>
-          <input id="bsaGraduate" type="file" accept=".csv,text/csv">
-        </label>
-        <label class="upload-card required" for="bsaRetention">
-          <span class="step">C</span>
-          <span class="upload-title">BSA retention report</span>
-          <span class="upload-copy">Placements with Retention · 180- and 365-day checks</span>
-          <span class="file-name" id="bsaRetentionName">Choose CSV</span>
-          <input id="bsaRetention" type="file" accept=".csv,text/csv">
-        </label>
-        <label class="upload-card required" for="osyReport">
-          <span class="step">D</span>
-          <span class="upload-title">OSY report</span>
-          <span class="upload-copy">OSY · intake, status, scores, and referral data</span>
-          <span class="file-name" id="osyReportName">Choose CSV</span>
-          <input id="osyReport" type="file" accept=".csv,text/csv">
-        </label>
-      </div>
+      <label class="upload-card upload-wide" for="fileInput">
+        <span class="upload-title">Add CSV reports</span>
+        <span class="upload-copy">File names must start with a program name and an underscore (e.g. <code>BSA_</code>, <code>OSY_</code>); everything before the first underscore becomes the program name. Program names are 1–5 characters with no spaces. Select several files at once or add more later.</span>
+        <span class="file-name">Choose CSVs</span>
+        <input id="fileInput" type="file" accept=".csv,text/csv" multiple>
+      </label>
+      <div class="file-list" id="fileList"></div>
 
       <div class="controls">
-        <button class="button primary" id="generateButton" type="button" disabled>Generate master CSV <span aria-hidden="true">↗</span></button>
+        <button class="button primary" id="joinButton" type="button" disabled>Join reports <span aria-hidden="true">↗</span></button>
         <button class="button secondary" id="resetButton" type="button">Reset</button>
       </div>
-      <p class="status" id="status" role="status">Add all four reports to begin.</p>
+      <p class="status" id="status" role="status">Add reports to begin.</p>
     </section>
 
-    <section class="results" aria-labelledby="results-heading">
+    <section class="results" id="results" aria-labelledby="results-heading" hidden>
       <div class="section-heading">
         <div>
-          <p class="eyebrow">02 / Review</p>
+          <p class="eyebrow">02 / Joined report</p>
           <h2 id="results-heading">Join summary</h2>
         </div>
-        <button class="button download" id="downloadButton" type="button" disabled>Download CSV <span aria-hidden="true">↓</span></button>
       </div>
       <div class="metrics" id="metrics" aria-live="polite">
-        <div class="metric"><strong>—</strong><span>Output rows</span></div>
-        <div class="metric"><strong>—</strong><span>Added BSA records</span></div>
-        <div class="metric"><strong>—</strong><span>Added OSY records</span></div>
-        <div class="metric"><strong>—</strong><span>Co-enrolled</span></div>
+        <div class="metric"><strong>—</strong><span>People</span></div>
+        <div class="metric"><strong>—</strong><span>Files joined</span></div>
+        <div class="metric"><strong>—</strong><span>Value conflicts</span></div>
+        <div class="metric"><strong>—</strong><span>Possible name typos</span></div>
       </div>
-      <div class="review-panel" id="reviewPanel">
-        <p class="empty-state">Your join summary will appear here after generation.</p>
+      <div class="review-panel" id="reviewPanel"></div>
+    </section>
+
+    <section class="results" id="conflicts" aria-labelledby="conflicts-heading" hidden>
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">03 / Conflicts within each file</p>
+          <h2 id="conflicts-heading">Resolve differing values within a file</h2>
+        </div>
+      </div>
+      <p class="review-copy">Columns where one person has several rows with different values in the same report (for example, one row per program level). Choose a rule per column, then open a column to override individual people. These choices produce each file's value for the person, which feeds the next step.</p>
+      <div class="review-panel" id="conflictPanel"></div>
+    </section>
+
+    <section class="results" id="crossConflicts" aria-labelledby="cross-conflicts-heading" hidden>
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">04 / Conflicts across files</p>
+          <h2 id="cross-conflicts-heading">Resolve differing values across files</h2>
+        </div>
+      </div>
+      <p class="review-copy">After step 03, each file has one value per person. These are columns where those per-file values still differ between reports. Changing a step 03 rule can add or remove conflicts here.</p>
+      <div class="review-panel" id="crossConflictPanel"></div>
+      <div class="controls section-end">
+        <button class="button primary" id="downloadJoinedButton" type="button">Download joined CSV <span aria-hidden="true">↓</span></button>
+        <span class="review-copy">All columns from all reports, with the conflict choices above applied.</span>
       </div>
     </section>
+
+    <section class="results" id="masterSection" aria-labelledby="master-heading" hidden>
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">05 / Master report</p>
+          <h2 id="master-heading">Choose master columns</h2>
+        </div>
+        <button class="button download" id="downloadMasterButton" type="button">Download master CSV <span aria-hidden="true">↓</span></button>
+      </div>
+      <p class="review-copy">Transformations apply only to the master report; the joined report keeps raw values.</p>
+      <div id="masterPanel"></div>
+      <div class="review-panel" id="masterIssues"></div>
+    </section>
+
+    <dialog class="rows-dialog" id="rowsDialog" aria-label="Source rows">
+      <div class="dialog-body" id="rowsDialogBody"></div>
+    </dialog>
 
     <footer>
       <span>Output schema: <strong>master (1).csv</strong></span>
-      <span>Matching: email first, then normalized name</span>
+      <span>Matching: normalized name (case, spacing, punctuation ignored)</span>
     </footer>
   </main>
 </body>

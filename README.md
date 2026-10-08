@@ -1,75 +1,65 @@
-# Student Report Joiner
+# Master Report Generator
 
-A static JavaScript application for joining the BSA contact report, BSA graduate/employer report, BSA placement retention report, and OSY report into the `master (1).csv` schema.
+A static JavaScript application that joins any number of BSA and OSY CSV reports on the student's name, produces a total joined report with every column, and builds the master report from selected columns.
 
 ## Run locally
 
-Open `index.html` in a browser, or serve this folder with any static server. No student data leaves the browser: files are read with the browser File API and the generated CSV is created locally.
+Open `index.html` in a browser, or serve this folder with any static server. No student data leaves the browser: files are read with the browser File API and the generated CSVs are created locally.
 
-Upload:
+## Workflow
 
-1. The BSA contact report (`Student Info...csv`)
-2. The BSA graduate report (`All Graduates...csv`)
-3. The BSA retention report (`Placements with Retention...csv`)
-4. The OSY report (`osy...csv`)
+### 1. Load reports
 
-Each upload is validated before it is accepted. The app dynamically locates the header row instead of requiring it to be on row 1. This supports OSY workbooks exported with summary rows above the table and a continuation header row. The BSA contact and graduate reports are expected to have their headers on row 1.
+Add any number of CSV files. Each file name must start with a program name followed by an underscore, for example `BSA_Student Info.csv` or `OSY_2024-2025.csv`. Everything before the first underscore becomes that file's program name, exactly as written. The program name must be 1–5 characters with no spaces. Files that break these rules are rejected, and the message explains why for each file.
 
-The upload is rejected when the required columns for that report are missing. The error message identifies the file and lists the expected column groups. Rejected files are cleared from the workflow and cannot be used to generate a report.
+For each file, the app shows:
 
-## Merging mechanism
+- **Header row**: auto-detected as the first row that is at least 60% as full as the fullest row near the top. This skips the title and filter rows above Salesforce exports. Edit the row number to override it.
+- **Header continues on next row**: for workbooks whose header spans two rows (for example, the OSY alumni sheet). Blank header cells are filled from the next row. Auto-detected, and can be toggled.
+- **Join on**: a single column (prefilled with `Full Name` or `Name`) or a first + last combination (prefilled with `First Name` + `Last Name`).
 
-The app builds the output in three stages:
+### 2. Joined report
 
-1. Each BSA contact record becomes a `BSA` row. Its placement fields, including `Placement Entity`, `Placement Type`, and `Placement Title`, are populated from the matching BSA graduate record.
-2. BSA graduate records are matched to BSA contact records by normalized email first, then normalized full name. Normalization removes capitalization, accents, spaces, and punctuation.
-3. OSY records are matched against BSA contacts using the same email-first/name-second rule.
+All files are joined on the name, normalized by ignoring case, accents, spacing, and punctuation. Email is not used.
 
-When an OSY record matches a BSA contact, the existing BSA row is retained and its `Program Name` changes to `BSA + OSY`. This produces one merged row rather than duplicate BSA and OSY rows. The BSA contact and graduate placement data remain in that row. The OSY record is listed in the review panel as co-enrolled.
+- One row per person. `Name` is the first spelling seen; `Program Name` lists every program the person appears in (`BSA`, `OSY`, or `BSA + OSY`).
+- Every column from every file is included, unchanged. Columns with the same normalized header (for example `Cohort` and `Cohort `) are merged into one column. Source columns named `Name` or `Program Name` are kept as `Name (source)` / `Program Name (source)`.
+- Rows whose name is blank or is not at least two words with a non-numeric character are excluded and listed as failed rows. OSY section markers (`Dropped After Certified`) are ignored.
+- Names that differ by one or two letters and never appear in the same file (for example `Patience Carrier` / `Patrience Carrier`) are listed as possible typos. They are **not** joined automatically. Each pair has **Join as …** buttons, one for each spelling, to confirm the join and choose the name that is kept. Confirmed joins are listed under **Confirmed name joins**, where each can be undone. Joining or undoing rebuilds the joined report, its conflicts, and the master report.
 
-If an OSY record does not match a BSA contact, it is appended as a separate `OSY` row. OSY-only rows receive their contact and demographic fields from the OSY report and have blank placement fields.
 
-The OSY marker row named `Dropped After Certified` is ignored. The common source typo `Dropped Afer Certified` is ignored as well. Individual student records listed below that marker are still processed.
+### 3. Conflicts
 
-Currently, merging changes the program label but does not copy OSY-specific fields such as `Student Status` into an existing BSA row. The review area lists both OSY-only records and matched co-enrolled records.
+A conflict is a person with more than one distinct non-blank value in a column. Values that differ only in capitalization (`kevin` / `Kevin`) count as the same value, and the first spelling seen is kept. Conflicts can occur:
 
-## Master column mapping
+- **Within a file**: for example, Academy Student Info has one row per program level.
+- **Across files**: for example, `Gender` is `Male` in one report and `M` in another.
 
-The generated report uses the following source-column mapping. `BSA contact` refers to `Student Info...csv`, `BSA graduate` refers to `All Graduates...csv`, `BSA retention` refers to `Placements with Retention...csv`, and `OSY` refers to `osy...csv`.
+Within-file conflicts are resolved first, then the per-file results are compared across files. Each conflicting column has a rule: **Join with ;** (default), **First value**, or **Last value**, in row order within a file or upload order across files. Open a column to override the rule for individual people, either by joining or by picking one specific value.
 
-| Master column | BSA contact source | BSA graduate source | BSA retention source | OSY source | Notes |
-| --- | --- | --- | --- | --- | --- |
-| `Program Name` | Derived | Derived | -- | Derived | `BSA`, `OSY`, or `BSA + OSY` for matched records |
-| `Name` | `Full Name` | Used for matching only | Used for matching only | `Name` | BSA falls back to `First Name` + `Last Name` if needed |
-| `Address` | `Address` | -- | -- | `Address` | OSY address is split into address, city, state, and ZIP using known BSA cities as reference |
-| `City` | `City` | -- | -- | `Address` | BSA falls back to the parsed address |
-| `State` | `State` | -- | -- | `Address` | BSA falls back to the parsed address |
-| `Zipcode` | `Zipcode` | -- | -- | `Address` | BSA falls back to the parsed address |
-| `Email` | `Email` | Used for matching only | -- | `Email` | Email is the first matching key where available |
-| `Phone Number ` | `Cell Phone` | -- | -- | `Phone Number ` | BSA falls back to `Phone Number` |
-| `DOB` | `DOB` | -- | -- | `D.O.B` | |
-| `Age` | `Age` | -- | -- | `Age` | |
-| `Gender` | `Gender` | -- | -- | `Gender` | |
-| `Ethnic Origin` | `Ethnicity` | -- | -- | `Ethnic Origin` | OSY falls back to `Ethnicity` |
-| `Demographics` | Blank | -- | -- | `Student Status` | Not copied from OSY into an existing BSA row during merging |
-| `Placement Entity` | -- | `Placement Entity` | -- | Blank | Graduate record matched to the BSA contact |
-| `Placement Type` | -- | `Placement Type` | -- | Blank | Graduate record matched to the BSA contact |
-| `Placement Title` | -- | `Placement Title` | -- | Blank | Graduate record matched to the BSA contact |
-| `180 Day Check\\nStill Employed?` | Blank | -- | `180 Day Check\\nStill Employed?` | Blank | Retention record matched by normalized first and last name |
-| `365 Day Check\\nStill Employed?` | Blank | -- | `365 Day Check\\nStill Employed?` | Blank | Retention record matched by normalized first and last name |
+Click a person (or **View conflicts**) to open their source rows in a pop-up. If the rows belong to two different people who share a name, choose **Different people? Split…**. This lists every row with that name across all files. Assign each row to Person 1, Person 2, and so on, then choose **Apply split**. Each person becomes a separate row with the same name, gets their own `Program Name`, and goes through conflict resolution and the master report separately. Person 1 keeps any rules and overrides already chosen. Splits are listed under **Split people** in the join summary, where each can be undone. Splits last until the page is reset.
 
-The BSA graduate report supplies placement fields by matching on email first and normalized full name second; it does not create additional output rows by itself.
+After resolving conflicts, download the joined report with **Download joined CSV** (`joined-all-columns.csv`) at the end of the across-files step.
 
-OSY addresses are parsed from the end of the address using ZIP/state patterns and city names found in the BSA contact report. The parser also tolerates missing state abbreviations, common one- or two-character city typos, and apartment text after the ZIP. When an address cannot be parsed confidently, the original address is retained and the uncertain location fields remain blank.
+### 4. Master report
 
-## Validation
+The master column list starts from the `master (1).csv` schema. Each master column takes the first non-blank value from one or more joined columns, which are prefilled where a matching header exists. You can add fallbacks, change sources, reorder, remove, or add columns, and reset to the preset.
 
-After the join is generated, the app checks that the output contains the expected number of rows:
+Transformations apply **only** to the master report:
 
-`BSA contact rows + OSY-only rows = output rows`
+| Master column | Transformation |
+| --- | --- |
+| `Enrollment Date` | Must be a valid `M/D/YYYY` date. Otherwise it is exported blank and listed as an issue. Joined values such as `1/2/2024; 3/4/2024` are invalid, so pick a single-value rule for the source column. |
+| `Address`, `City`, `State`, `Zipcode` | When city, state, and ZIP are all blank, they are parsed from the end of the address. City names come from the master `City` values, and one- or two-letter city typos are tolerated. |
+| `Age` | Calculated from `DOB` when blank. |
+| `Industry Related?` | Normalized to `Industry Related`, `Non Industry Related`, or `Industry Educational`. Profession codes are mapped as `00` = non-industry, `01` = educational, and anything else = industry. |
+| `Gender` | `M` / `F` (any case) are mapped to `Male` / `Female`. Joined values like `Male; M` collapse to `Male`. The joined report keeps the original values. |
 
-Merged BSA + OSY students count as one output row. The app also checks that every matched OSY record points to an existing BSA output row. Records with neither a usable name nor email are reported as validation issues instead of being silently overlooked.
+Download it with **Download master CSV** (`master-report.csv`). Transformation issues appear below the column list.
 
-Validation results appear in the review panel. Each issue includes the source file category and CSV row number, including the header row in the count. Failed rows are excluded from the downloadable master report and shown separately with their name, email, and error. Successful rows are included in the report and listed in a collapsed review section. When issues are found, the status message and issue list are highlighted; otherwise, the review panel displays a validation-passed message.
+## Security
 
-Identity validation requires each BSA and OSY record to have a full name containing at least two words and at least one non-numeric character. A blank email is allowed, but when an email is present it must use a valid email format. Rows that fail either check are excluded from the output and shown in the failed-row review.
+- **Formula injection:** values starting with `=`, `+`, `-`, `@`, a tab, or a carriage return are written to both CSVs with a leading apostrophe (`'=…`). Excel and Google Sheets then show them as text instead of running them as formulas. For example, a name entered as `=HYPERLINK(…)` cannot become a link that sends data elsewhere. This also applies to legitimate values like `+1 916…` or `-1`.
+- **Escaping:** every value shown on the page, including file names, program names, CSV cells and headers, is HTML-escaped, so CSV content cannot run code in the page.
+- **No outside connections:** fonts (DM Mono, Space Grotesk; SIL Open Font License) are bundled in `fonts/` and loaded through `fonts.css`. Opening the page makes no request to Google or any other server. Keep `fonts/` and `fonts.css` next to `index.html`.
+- **Content Security Policy:** `index.html` only allows scripts, styles, fonts, and images from the app's own folder. It blocks inline scripts and all network connections. If an escaping bug ever let CSV content into the page as HTML, the browser would still refuse to run it. `file:` is allowed so the app keeps working when opened directly from disk. A no-referrer policy is also set.
