@@ -33,13 +33,17 @@ All files are joined on the name, normalized by ignoring case, accents, spacing,
 A conflict is a person with more than one distinct non-blank value in a column. Values that differ only in capitalization (`kevin` / `Kevin`) count as the same value, and the first spelling seen is kept. Conflicts can occur:
 
 - **Within a file**: for example, Academy Student Info has one row per program level.
-- **Across files**: for example, `Gender` is `Male` in one report and `M` in another.
+- **Across files**: for example, `Phone` is one number in one report and another number in a second report.
 
-Within-file conflicts are resolved first, then the per-file results are compared across files. Each conflicting column has a rule: **Join with ;** (default), **First value**, or **Last value**, in row order within a file or upload order across files. Open a column to override the rule for individual people, either by joining or by picking one specific value.
+`Gender` values are standardized as each file is read: `M` / `F` (any case) become `Male` / `Female` everywhere, including the joined report and the source-row pop-up, so they never count as a conflict.
+
+Within-file conflicts are resolved first, then the per-file results are compared across files. Each conflicting column has a rule: **Leave blank** (default), **Join with ;**, **First value**, or **Last value**, in row order within a file or upload order across files. Open a column to override the rule for individual people, either by joining, picking one specific value, or leaving it blank.
+
+An unresolved conflict is always exported as blank, so the reports never contain a value nobody chose. A blank from step 03 is not filled from another file, a master fallback column, or a master calculation. A person left unresolved within a file does not appear in the across-files step until that conflict is resolved.
 
 Click a person (or **View conflicts**) to open their source rows in a pop-up. If the rows belong to two different people who share a name, choose **Different people? Split…**. This lists every row with that name across all files. Assign each row to Person 1, Person 2, and so on, then choose **Apply split**. Each person becomes a separate row with the same name, gets their own `Program Name`, and goes through conflict resolution and the master report separately. Person 1 keeps any rules and overrides already chosen. Splits are listed under **Split people** in the join summary, where each can be undone. Splits last until the page is reset.
 
-After resolving conflicts, download the joined report with **Download joined CSV** (`joined-all-columns.csv`) at the end of the across-files step.
+After resolving conflicts, download the joined report with **Download joined CSV** (`joined-all-columns.csv`) at the end of the across-files step. If any values will be blank, a warning lists them by column and person first, with **Go back and review** and **Download with blanks**.
 
 ### 4. Master report
 
@@ -49,13 +53,13 @@ Transformations apply **only** to the master report:
 
 | Master column | Transformation |
 | --- | --- |
-| `Enrollment Date` | Must be a valid `M/D/YYYY` date. Otherwise it is exported blank and listed as an issue. Joined values such as `1/2/2024; 3/4/2024` are invalid, so pick a single-value rule for the source column. |
-| `Address`, `City`, `State`, `Zipcode` | When city, state, and ZIP are all blank, they are parsed from the end of the address. City names come from the master `City` values, and one- or two-letter city typos are tolerated. |
-| `Age` | Calculated from `DOB` when blank. |
+| `Enrollment Date` | Must be a valid `M/D/YYYY` date. Otherwise it is exported blank and listed as an issue. Values joined by choice, such as `1/2/2024; 3/4/2024`, are invalid, so pick a single-value rule for the source column. |
+| `Address`, `City`, `State`, `Zipcode` | When city, state, and ZIP are all blank, they are parsed from the end of the address. An address joined with `;` is not parsed and is listed as an issue. City names come from the master `City` values, and one- or two-letter city typos are tolerated. |
+| `Age` | Calculated from `DOB` when blank. If `DOB` can't be read, it is exported blank and listed as an issue. |
 | `Industry Related?` | Normalized to `Industry Related`, `Non Industry Related`, or `Industry Educational`. Profession codes are mapped as `00` = non-industry, `01` = educational, and anything else = industry. |
-| `Gender` | `M` / `F` (any case) are mapped to `Male` / `Female`. Joined values like `Male; M` collapse to `Male`. The joined report keeps the original values. |
+| `Gender` | `M` / `F` (any case) are mapped to `Male` / `Female`, which also covers a master `Gender` column sourced from a differently named joined column. |
 
-Download it with **Download master CSV** (`master-report.csv`). Transformation issues appear below the column list.
+Download it with **Download master CSV** (`master-report.csv`). The same warning appears first if values will be blank or there are transformation issues, which also appear below the column list.
 
 ## Security
 

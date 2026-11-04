@@ -68,7 +68,7 @@
           <h2 id="conflicts-heading">Resolve differing values within a file</h2>
         </div>
       </div>
-      <p class="review-copy">Columns where one person has several rows with different values in the same report (for example, one row per program level). Choose a rule per column, then open a column to override individual people. These choices produce each file's value for the person, which feeds the next step.</p>
+      <p class="review-copy">Columns where one person has several rows with different values in the same report (for example, one row per program level). Values stay blank until you choose a rule for the column or open it to decide for individual people. These choices produce each file's value for the person, which feeds the next step.</p>
       <div class="review-panel" id="conflictPanel"></div>
     </section>
 
@@ -79,7 +79,7 @@
           <h2 id="cross-conflicts-heading">Resolve differing values across files</h2>
         </div>
       </div>
-      <p class="review-copy">After step 03, each file has one value per person. These are columns where those per-file values still differ between reports. Changing a step 03 rule can add or remove conflicts here.</p>
+      <p class="review-copy">After step 03, each file has one value per person. These are columns where those per-file values still differ between reports. Changing a step 03 rule can add or remove conflicts here. A person left unresolved in step 03 stays blank in that column and only appears here once it is resolved.</p>
       <div class="review-panel" id="crossConflictPanel"></div>
       <div class="controls section-end">
         <button class="button primary" id="downloadJoinedButton" type="button">Download joined CSV <span aria-hidden="true">↓</span></button>
@@ -100,7 +100,7 @@
       <div class="review-panel" id="masterIssues"></div>
     </section>
 
-    <dialog class="rows-dialog" id="rowsDialog" aria-label="Source rows">
+    <dialog class="rows-dialog" id="rowsDialog" aria-label="Details">
       <div class="dialog-body" id="rowsDialogBody"></div>
     </dialog>
 

@@ -24,14 +24,17 @@ const MASTER_PRESET = [
 const MAX_PROGRAM_LENGTH = 5;
 const KEY_COLUMNS = ['Name', 'Program Name'];
 const IGNORED_NAMES = new Set(['droppedaftercertified', 'droppedafercertified']);
-const RULE_LABELS = { join: 'Join with ;', first: 'First value', last: 'Last value' };
+const RULE_LABELS = { blank: 'Leave blank', join: 'Join with ;', first: 'First value', last: 'Last value' };
+const BLANK_LABEL = 'Blank (unresolved)';
 
-const state = { files: [], nextId: 1, base: null, joined: null, rules: {}, overrides: {}, merges: [], splits: {}, master: null, openDetails: new Set() };
+const state = { files: [], nextId: 1, base: null, joined: null, rules: {}, overrides: {}, merges: [], splits: {}, master: null, openDetails: new Set(), pendingDownload: null };
 
 const $ = (id) => document.getElementById(id);
 const normalizeHeader = (value) => String(value ?? '').replace(/^﻿/, '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
 const normalizeText = (value) => String(value ?? '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '');
 const clean = (value) => String(value ?? '').trim();
+const GENDER_WORDS = { m: 'Male', male: 'Male', f: 'Female', female: 'Female' };
+const genderWord = (value) => GENDER_WORDS[value.toLowerCase()] || value;
 
 function parseRawCsv(text) {
   text = text.replace(/^﻿/, '');
@@ -94,7 +97,10 @@ function applyHeader(file) {
   const dataStart = headerIndex + (file.continuation ? 2 : 1);
   file.records = file.rows.slice(dataStart).map((row) => ({
     line: row.line,
-    values: Object.fromEntries(file.columns.map((column) => [column.key, clean(row.values[column.index])]))
+    values: Object.fromEntries(file.columns.map((column) => {
+      const value = clean(row.values[column.index]);
+      return [column.key, column.key === 'gender' ? genderWord(value) : value];
+    }))
   })).filter((record) => Object.values(record.values).some(Boolean));
   const keys = file.columns.map((column) => column.key);
   const mode = file.nameMode;
@@ -299,11 +305,14 @@ function distinctIgnoringCase(values) {
   return [...byLowercase.values()];
 }
 
+// null marks a cell left blank by an unresolved conflict, as opposed to '' for a value that was never there.
+// Later steps must not fill a null cell from another file, a fallback column, or a calculation.
 function applyChoice(choice, present, distinct) {
   if (choice === 'first') return present[0];
   if (choice === 'last') return present.at(-1);
+  if (choice === 'join') return distinct.join('; ');
   if (choice.startsWith('value:') && distinct.includes(choice.slice(6))) return choice.slice(6);
-  return distinct.join('; ');
+  return null;
 }
 
 function resolve(values, ruleKey, person, conflicts, scope, column, fileIds) {
@@ -311,7 +320,7 @@ function resolve(values, ruleKey, person, conflicts, scope, column, fileIds) {
   const distinct = distinctIgnoringCase(present);
   if (distinct.length <= 1) return distinct[0] || '';
   const override = state.overrides[`${ruleKey}|${person.key}`];
-  const ruleValue = applyChoice(state.rules[ruleKey] || 'join', present, distinct);
+  const ruleValue = applyChoice(state.rules[ruleKey] || 'blank', present, distinct);
   const value = override ? applyChoice(override, present, distinct) : ruleValue;
   if (!conflicts.has(ruleKey)) conflicts.set(ruleKey, { ruleKey, scope, column, columnKey: ruleKey.split('|').at(-1), items: [] });
   conflicts.get(ruleKey).items.push({ personKey: person.key, name: person.name, person, fileIds, values: distinct, ruleValue, value, overridden: Boolean(override) });
@@ -326,7 +335,7 @@ function computeJoined(base) {
     base.columns.forEach(([key, header]) => {
       const files = state.files.filter((file) => person.rowsByFile.has(file.id) && file.columns.some((column) => column.key === key));
       const fileValues = files.map((file) => resolve(person.rowsByFile.get(file.id).map((record) => record.values[key]), `file:${file.id}|${key}`, person, conflicts, `Within ${file.name}`, header, [file.id]));
-      row[header] = resolve(fileValues, `cross|${key}`, person, conflicts, 'Across files', header, files.map((file) => file.id));
+      row[header] = fileValues.includes(null) ? null : resolve(fileValues, `cross|${key}`, person, conflicts, 'Across files', header, files.map((file) => file.id));
     });
     return row;
   });
@@ -395,7 +404,7 @@ function renderConflicts() {
 }
 
 function conflictRow(conflict) {
-  const rule = state.rules[conflict.ruleKey] || 'join';
+  const rule = state.rules[conflict.ruleKey] || 'blank';
   const open = state.openDetails.has(conflict.ruleKey);
   const overridden = conflict.items.filter((item) => state.overrides[`${conflict.ruleKey}|${item.personKey}`]).length;
   return `<div class="conflict-row">
@@ -409,9 +418,9 @@ function overrideList(conflict) {
   return `<ul class="override-list">${conflict.items.map((item) => {
     const key = `${conflict.ruleKey}|${item.personKey}`;
     const current = state.overrides[key] || '';
-    const options = [['', item.ruleValue], ['join', `Join with ;: ${item.values.join('; ')}`], ...item.values.map((value) => [`value:${value}`, `Pick: ${value}`])];
+    const options = [['', item.ruleValue ?? BLANK_LABEL], ...(item.ruleValue === null ? [] : [['blank', 'Leave blank']]), ['join', `Join with ;: ${item.values.join('; ')}`], ...item.values.map((value) => [`value:${value}`, `Pick: ${value}`])];
     return `<li class="row-link${item.overridden ? ' overridden' : ''}" data-row-key="${escapeHtml(key)}" tabindex="0" title="View ${escapeHtml(item.name)}'s conflicting rows">
-      <span class="override-person"><strong>${escapeHtml(item.name)}</strong><span class="override-value">→ ${escapeHtml(item.value)}${item.overridden ? ' <em>(override)</em>' : ''}</span></span>
+      <span class="override-person"><strong>${escapeHtml(item.name)}</strong><span class="override-value">→ ${escapeHtml(item.value ?? BLANK_LABEL)}${item.overridden ? ' <em>(override)</em>' : ''}</span></span>
       <span class="override-controls"><select data-override="${escapeHtml(key)}" aria-label="Value for ${escapeHtml(item.name)}">${options.map(([value, label]) => `<option value="${escapeHtml(value)}"${value === current ? ' selected' : ''}>${escapeHtml(label)}</option>`).join('')}</select>
       <button class="button view-conflicts" type="button" aria-label="View conflicts for ${escapeHtml(item.name)}">View conflicts ↗</button></span>
     </li>`;
@@ -448,7 +457,7 @@ function openRowsDialog(rowKey) {
   if (!item) return;
   $('rowsDialogBody').innerHTML = `<header class="dialog-header">
       <div><p class="eyebrow">${escapeHtml(conflict.scope)} · ${escapeHtml(conflict.column)}</p><h2>${escapeHtml(item.name)}</h2>
-      <p class="review-copy">Current value: <strong>${escapeHtml(item.value)}</strong>${item.overridden ? ' (override)' : ''}</p></div>
+      <p class="review-copy">Current value: <strong>${escapeHtml(item.value ?? BLANK_LABEL)}</strong>${item.overridden ? ' (override)' : ''}</p></div>
       <span class="dialog-actions"><button class="button secondary small" type="button" data-action="open-split" data-key="${escapeHtml(item.person.baseKey)}">Different people? Split…</button>
       <button class="icon-button" type="button" data-action="close-dialog" aria-label="Close">×</button></span>
     </header>
@@ -492,6 +501,7 @@ function onDialogClick(event) {
   if (!button) return;
   const { action, key } = button.dataset;
   if (action === 'close-dialog') $('rowsDialog').close();
+  else if (action === 'confirm-download') { $('rowsDialog').close(); state.pendingDownload(); }
   else if (action === 'open-split') openSplitDialog(key);
   else if (action === 'apply-split') applySplit(key);
   else if (action === 'remove-split') { delete state.splits[key]; rebuildAfterIdentityChange(); }
@@ -611,7 +621,7 @@ function industryTag(value) {
 }
 
 function genderValue(value) {
-  const mapped = clean(value).split(/;\s*/).filter(Boolean).map((part) => ({ m: 'Male', f: 'Female' }[part.toLowerCase()] || part));
+  const mapped = clean(value).split(/;\s*/).filter(Boolean).map(genderWord);
   return distinctIgnoringCase(mapped).join('; ');
 }
 
@@ -619,7 +629,10 @@ function buildMaster() {
   const issues = [];
   const headers = state.master.map((column) => column.header);
   const columnFor = (key) => state.master.find((column) => normalizeHeader(column.header) === key);
-  const firstValue = (row, column) => column.sources.map((source) => row[source]).find((value) => clean(value)) || '';
+  const firstValue = (row, column) => {
+    const value = column.sources.map((source) => row[source]).find((candidate) => candidate === null || clean(candidate));
+    return value === undefined ? '' : value;
+  };
   const cityColumn = columnFor('city');
   const knownCities = cityColumn ? [...new Set(state.joined.rows.map((row) => firstValue(row, cityColumn)).filter(Boolean))] : [];
   const [address, city, region, zip, dob, age, enrollment, industry, gender] =
@@ -630,9 +643,14 @@ function buildMaster() {
       issues.push(`${joinedRow['Name']}: invalid ${enrollment} "${row[enrollment]}" exported as blank.`);
       row[enrollment] = '';
     }
-    if (age && dob && !row[age]) row[age] = calculateAge(row[dob]);
+    if (age && dob && row[age] === '' && row[dob]) {
+      row[age] = calculateAge(row[dob]);
+      if (!row[age]) issues.push(`${joinedRow['Name']}: could not calculate ${age} from ${dob} "${row[dob]}"; exported as blank.`);
+    }
     const locationHeaders = [city, region, zip].filter(Boolean);
-    if (address && row[address] && locationHeaders.length && locationHeaders.every((header) => !row[header])) {
+    if (address && row[address]?.includes(';') && locationHeaders.length && locationHeaders.every((header) => row[header] === '')) {
+      issues.push(`${joinedRow['Name']}: joined ${address} "${row[address]}" was not split into ${locationHeaders.join(', ')}; those are exported as blank.`);
+    } else if (address && row[address] && locationHeaders.length && locationHeaders.every((header) => row[header] === '')) {
       const parsed = parseAddress(row[address], knownCities);
       if (parsed.city || parsed.state || parsed.zipcode) {
         row[address] = parsed.address || row[address];
@@ -641,8 +659,8 @@ function buildMaster() {
         if (zip) row[zip] = parsed.zipcode;
       }
     }
-    if (industry) row[industry] = industryTag(row[industry]);
-    if (gender) row[gender] = genderValue(row[gender]);
+    if (industry && row[industry]) row[industry] = industryTag(row[industry]);
+    if (gender && row[gender]) row[gender] = genderValue(row[gender]);
     return row;
   });
   return { headers, rows, issues };
@@ -698,7 +716,7 @@ function levenshteinDistance(left, right) {
 }
 
 function calculateAge(value) {
-  if (!clean(value)) return '';
+  if (!clean(value) || value.includes(';')) return '';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
   const today = new Date();
@@ -738,6 +756,29 @@ function download(filename, csv) {
   URL.revokeObjectURL(link.href);
 }
 
+// Downloads straight away when nothing needs flagging; otherwise warns first. `rows` line up with state.joined.rows.
+function requestDownload(filename, headers, rows, issues = []) {
+  const blanks = new Map();
+  rows.forEach((row, index) => headers.filter((header) => row[header] === null).forEach((header) => {
+    blanks.set(header, [...(blanks.get(header) || []), state.joined.rows[index]['Name']]);
+  }));
+  const save = () => download(filename, toCsv(headers, rows));
+  if (!blanks.size && !issues.length) { save(); return; }
+  state.pendingDownload = save;
+  const blankCount = [...blanks.values()].reduce((total, names) => total + names.length, 0);
+  const list = (label, items, listClass = '') => `<details class="review-details"><summary>${escapeHtml(label)} (${items.length})</summary><ul class="review-list ${listClass}">${items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul></details>`;
+  $('rowsDialogBody').innerHTML = `<header class="dialog-header">
+      <div><p class="eyebrow">Before you download</p><h2>${escapeHtml(filename)}</h2>
+      ${blankCount ? `<p class="review-copy">${blankCount} ${blankCount === 1 ? 'value' : 'values'} will be <strong>blank</strong> because the conflict is unresolved. To fill them in, choose a rule or pick a value in steps 03 and 04.</p>` : ''}
+      ${issues.length ? `<p class="review-copy">${issues.length} other ${issues.length === 1 ? 'value' : 'values'} could not be used, as listed below.</p>` : ''}</div>
+      <span class="dialog-actions"><button class="icon-button" type="button" data-action="close-dialog" aria-label="Close">×</button></span>
+    </header>
+    <div class="dialog-scroll">${[...blanks].map(([header, names]) => list(header, names)).join('')}${issues.length ? list('Other issues', issues, 'error-list') : ''}</div>
+    <div class="controls section-end"><button class="button secondary" type="button" data-action="close-dialog">Go back and review</button>
+    <button class="button primary" type="button" data-action="confirm-download">Download with blanks <span aria-hidden="true">↓</span></button></div>`;
+  $('rowsDialog').showModal();
+}
+
 function setStatus(message, isError = false) {
   $('status').textContent = message;
   $('status').classList.toggle('error', isError);
@@ -770,11 +811,11 @@ $('rowsDialog').addEventListener('change', (event) => {
 });
 $('masterPanel').addEventListener('change', onMasterChange);
 $('masterPanel').addEventListener('click', onMasterClick);
-$('downloadJoinedButton').addEventListener('click', () => download('joined-all-columns.csv', toCsv(state.joined.headers, state.joined.rows)));
+$('downloadJoinedButton').addEventListener('click', () => requestDownload('joined-all-columns.csv', state.joined.headers, state.joined.rows));
 $('downloadMasterButton').addEventListener('click', () => {
   const master = buildMaster();
   $('masterIssues').innerHTML = master.issues.length
     ? `<details class="review-details"><summary>Master transformation issues (${master.issues.length})</summary><ul class="review-list error-list">${master.issues.map((issue) => `<li>${escapeHtml(issue)}</li>`).join('')}</ul></details>`
     : '<p class="review-copy">No transformation issues.</p>';
-  download('master-report.csv', toCsv(master.headers, master.rows));
+  requestDownload('master-report.csv', master.headers, master.rows, master.issues);
 });
